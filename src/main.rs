@@ -1,6 +1,6 @@
 use confy;
 mod ffmpeg;
-use ffmpeg::encode;
+use ffmpeg::*;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::metadata;
@@ -39,13 +39,13 @@ fn main() {
     let binding = cfg.gpu.to_lowercase();
     let gpu = binding.as_str();
 
-    // this part is really ugly, idk how to make it better
-    let mut video_bitrate =
-        cfg.size_mb * 8192.0 / ffmpeg::get_duration(input_file) - cfg.audio_bitrate;
+    // this entire part is really ugly, idk how to make it better
+    let mut video_bitrate = cfg.size_mb * 8192.0 / get_duration(input_file) - cfg.audio_bitrate;
+    // multiplying to go megabyte -> kilobit ^^^^^^^^
     let mut audio_bitrate = cfg.audio_bitrate;
     if video_bitrate < 0.0 {
         audio_bitrate += -video_bitrate;
-        video_bitrate = cfg.size_mb * 8192.0 / ffmpeg::get_duration(input_file);
+        video_bitrate = cfg.size_mb * 8192.0 / get_duration(input_file);
     }
 
     let video_codec = match codec {

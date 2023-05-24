@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 confy = "0.5.1"
+crossterm = "0.26.1"
 serde = { version = "1.0.163", features = ["derive"] }

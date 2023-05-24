@@ -1,1 +1,3 @@
 /target
+cli output template.txt
+ffmpeg example output.txt
