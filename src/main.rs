@@ -1,4 +1,3 @@
-use confy;
 mod ffmpeg;
 use ffmpeg::*;
 use serde::{Deserialize, Serialize};
@@ -89,6 +88,21 @@ fn main() {
         ))
         .with_extension(video_extension);
 
+    let input_filename = input_file.file_name().unwrap().to_str().unwrap();
+    let mut encode_counter: u8 = 1;
+
+    let temp_video_bitrate = video_bitrate / 1000.0;
+    println!(
+        "\ncompressing...  |
+----------------+-------------------------------
+input file      | {input_filename}
+target size     | {size}mb
+bitrate         | {temp_video_bitrate}kb/s
+codec           | {video_codec}
+----------------+-------------------------------",
+        size = cfg.size_mb
+    );
+
     loop {
         encode(
             &input_file.display().to_string(),
@@ -97,12 +111,15 @@ fn main() {
             audio_codec,
             (video_bitrate * 1024.0).to_string(),
             (audio_bitrate * 1024.0).to_string(),
+            encode_counter,
         )
         .unwrap();
         // 2-pass encoding isn't perfect, if it overshoots the filesize we try again with 95% of the bitrate
         video_bitrate *= 0.95;
+        encode_counter += 1;
         if (metadata(&output).unwrap().len() as f64) < (cfg.size_mb * 1000000.0).into() {
             break;
         }
     }
+    println!("\x1b[3E") // return cursor back down after printing
 }

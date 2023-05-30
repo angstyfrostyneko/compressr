@@ -2,8 +2,43 @@ use std::io::{BufRead, BufReader, Error, ErrorKind};
 use std::path::Path;
 use std::process::{Command, Stdio};
 
-fn prettify_output(line: String, frame_count: u64) {
-    println!("{}", line);
+fn prettify_output(
+    buffer: BufReader<std::process::ChildStdout>,
+    total_frames: u64,
+    encode_counter: u8,
+    current_pass: u8,
+) {
+    let mut fps = 0;
+    let mut current_frame: u64 = 0;
+    let encode_counter = encode_counter * 2;
+    let current_pass = encode_counter - (1 - current_pass);
+
+    buffer
+        .lines()
+        .filter_map(|line| line.ok())
+        .for_each(|line| {
+            if line.contains("frame") {
+                current_frame = line.split('=').nth(1).unwrap().parse::<u64>().unwrap()
+            }
+            if line.contains("fps") {
+                fps = line.split('=').nth(1).unwrap().parse::<f32>().unwrap() as i32
+            }
+            if fps != 0 && current_frame != 0 {
+                let percentage = ((current_frame as f64 / total_frames as f64) * 100.0) as u64;
+                let time_left = (total_frames - current_frame) / fps as u64;
+                let progress: f32 = percentage as f32 / 100.0 * 16.0; // 16 characters for the entire progress bar
+                let progress_bar = "█".repeat(progress as usize);
+                let progress_bar_left = " ".repeat(16 - progress as usize);
+                println!(
+                    "fps {fps}         | frame {current_frame}/{total_frames}
+{progress_bar}{progress_bar_left}| {percentage}%
+pass            | {current_pass}/{encode_counter}
+time left pass  | {time_left} seconds \x1b[4F" // going up 4 lines to write in place
+                );
+                fps = 0;
+                current_frame = 0
+            }
+        });
 }
 
 pub fn get_frame_count(input_file: &str) -> u64 {
@@ -19,7 +54,7 @@ pub fn get_frame_count(input_file: &str) -> u64 {
                 "stream=nb_read_packets",
                 "-of",
                 "csv=p=0",
-                input_file
+                input_file,
             ])
             .output()
             .expect("failed to execute process")
@@ -52,7 +87,8 @@ pub fn get_duration(input_file: &Path) -> f32 {
         .parse::<f32>()
         .unwrap()
 }
-// keep count of retries for prettify
+// todo: keep count of retries for prettify
+#[allow(clippy::too_many_arguments)]
 pub fn encode(
     input_file: &str,
     output_file: &str,
@@ -60,9 +96,10 @@ pub fn encode(
     audio_codec: &str,
     video_bitrate: String,
     audio_bitrate: String,
+    encode_counter: u8,
 ) -> Result<(), Error> {
-    let frame_count = get_frame_count(input_file);
-    // todo: this function doesn't need to return anything
+    let total_frames = get_frame_count(input_file);
+
     // pass 1
     let stdout = Command::new("ffmpeg")
         .args([
@@ -74,7 +111,8 @@ pub fn encode(
             "-b:v",
             &video_bitrate,
             "-progress",
-            "pipe:2",
+            "-",
+            "-nostats",
             "-pass",
             "1",
             "-fps_mode",
@@ -93,17 +131,15 @@ pub fn encode(
                 } else {
                     ""
                 }
-            }
+            },
         ])
-        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()?
-        .stderr
+        .stdout
         .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture error output."))?;
     let buffer = BufReader::new(stdout);
-    buffer
-        .lines()
-        .filter_map(|line| line.ok())
-        .for_each(|line| prettify_output(line, frame_count));
+    prettify_output(buffer, total_frames, encode_counter, 0);
 
     // pass 2
     let stdout = Command::new("ffmpeg")
@@ -116,7 +152,8 @@ pub fn encode(
             "-b:v",
             &video_bitrate,
             "-progress",
-            "pipe:2",
+            "-",
+            "-nostats",
             "-pass",
             "2",
             "-c:a",
@@ -125,15 +162,13 @@ pub fn encode(
             &audio_bitrate,
             output_file,
         ])
-        .stderr(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()?
-        .stderr
+        .stdout
         .ok_or_else(|| Error::new(ErrorKind::Other, "Could not capture error output."))?;
     let buffer = BufReader::new(stdout);
-    buffer
-        .lines()
-        .filter_map(|line| line.ok())
-        .for_each(|line| prettify_output(line, frame_count));
+    prettify_output(buffer, total_frames, encode_counter, 1);
 
     Ok(())
 }
