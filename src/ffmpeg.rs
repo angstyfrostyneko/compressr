@@ -13,32 +13,29 @@ fn prettify_output(
     let encode_counter = encode_counter * 2;
     let current_pass = encode_counter - (1 - current_pass);
 
-    buffer
-        .lines()
-        .filter_map(|line| line.ok())
-        .for_each(|line| {
-            if line.contains("frame") {
-                current_frame = line.split('=').nth(1).unwrap().parse::<u64>().unwrap()
-            }
-            if line.contains("fps") {
-                fps = line.split('=').nth(1).unwrap().parse::<f32>().unwrap() as i32
-            }
-            if fps != 0 && current_frame != 0 {
-                let percentage = ((current_frame as f64 / total_frames as f64) * 100.0) as u64;
-                let time_left = (total_frames - current_frame) / fps as u64;
-                let progress: f32 = percentage as f32 / 100.0 * 16.0; // 16 characters for the entire progress bar
-                let progress_bar = "█".repeat(progress as usize);
-                let progress_bar_left = " ".repeat(16 - progress as usize);
-                println!(
-                    "fps {fps}         | frame {current_frame}/{total_frames}
+    for line in buffer.lines().filter_map(|line| line.ok()) {
+        if line.contains("frame") {
+            current_frame = line.split('=').nth(1).unwrap().parse::<u64>().unwrap()
+        }
+        if line.contains("fps") {
+            fps = line.split('=').nth(1).unwrap().parse::<f32>().unwrap() as i32
+        }
+        if fps != 0 && current_frame != 0 {
+            let percentage = ((current_frame as f64 / total_frames as f64) * 100.0) as u64;
+            let time_left = (total_frames - current_frame) / fps as u64;
+            let progress: f32 = percentage as f32 / 100.0 * 16.0; // 16 characters for the entire progress bar
+            let progress_bar = "█".repeat(progress as usize);
+            let progress_bar_left = " ".repeat(16 - progress as usize);
+            println!(
+                "fps {fps}         | frame {current_frame}/{total_frames}
 {progress_bar}{progress_bar_left}| {percentage}%
 pass            | {current_pass}/{encode_counter}
 time left pass  | {time_left} seconds \x1b[4F" // going up 4 lines to write in place
-                );
-                fps = 0;
-                current_frame = 0
-            }
-        });
+            );
+            fps = 0;
+            current_frame = 0
+        }
+    }
 }
 
 pub fn get_frame_count(input_file: &str) -> u64 {
