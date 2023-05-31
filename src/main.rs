@@ -29,6 +29,9 @@ fn main() {
     let cli_args: Vec<String> = env::args().collect();
     let cfg: Config = confy::load("compressr", None).expect("Cannot load config file.");
 
+    if cli_args.len() == 1 {
+        panic!("Missing video path!");
+    }
     let input_file = Path::new(&cli_args[1]);
     let mut audio_codec = "aac";
     let mut video_extension = "mp4";

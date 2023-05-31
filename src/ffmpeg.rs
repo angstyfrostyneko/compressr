@@ -1,3 +1,4 @@
+use core::panic;
 use std::io::{BufRead, BufReader, Error, ErrorKind};
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -78,11 +79,14 @@ pub fn get_duration(input_file: &Path) -> f32 {
             .output()
             .expect("failed to execute process")
     };
-    String::from_utf8(output.stdout)
+    let this = String::from_utf8(output.stdout)
         .unwrap()
         .trim()
-        .parse::<f32>()
-        .unwrap()
+        .parse::<f32>();
+    match this {
+        Ok(t) => t,
+        Err(_) => panic!("File is not a video!"),
+    }
 }
 // todo: keep count of retries for prettify
 #[allow(clippy::too_many_arguments)]
